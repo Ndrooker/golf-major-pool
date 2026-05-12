@@ -11,6 +11,7 @@ export type EspnEvent = {
   id: string
   name: string
   shortName?: string
+  status?: { type?: { name?: string; state?: string; completed?: boolean } }
   competitions?: EspnCompetition[]
 }
 
@@ -40,10 +41,16 @@ export type EspnCompetitor = {
   statistics?: { name?: string; value?: number; displayValue?: string }[]
 }
 
+export type EspnLeaderboardResult = {
+  event: EspnEvent
+  competitors: EspnCompetitor[]
+  eventState: 'pre' | 'in' | 'post'
+}
+
 export async function fetchEspnLeaderboard(
   league: string,
   eventId?: string | null,
-): Promise<{ event: EspnEvent; competitors: EspnCompetitor[] }> {
+): Promise<EspnLeaderboardResult> {
   const params = new URLSearchParams({ league })
   if (eventId) params.set('event', String(eventId))
   const url = `${ESPN_BASE}?${params.toString()}`
@@ -53,7 +60,9 @@ export async function fetchEspnLeaderboard(
   const event = data.events?.[0]
   if (!event) throw new Error('No tournament data from ESPN')
   const competitors = event.competitions?.[0]?.competitors ?? []
-  return { event, competitors }
+  const rawState = event.status?.type?.state ?? 'pre'
+  const eventState = (rawState === 'in' || rawState === 'post') ? rawState : 'pre' as const
+  return { event, competitors, eventState }
 }
 
 export function competitorToGolferState(c: EspnCompetitor): GolferState | null {

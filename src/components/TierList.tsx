@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import type { TierDef } from '../tiers'
 import { submitPicks } from '../api/submitPicks'
 
@@ -26,13 +26,31 @@ const TIER_HEADER_COLORS: Record<number, string> = {
 
 export function TierList({ tiers, submitUrl, existingNames }: Props) {
   const [selections, setSelections] = useState<Record<number, string>>({})
-  const [name, setName] = useState('')
+  const [firstName, setFirstName] = useState('')
+  const [lastName, setLastName] = useState('')
   const [submitting, setSubmitting] = useState(false)
   const [submitted, setSubmitted] = useState(false)
+  const [savedName, setSavedName] = useState('')
+  const [savedPicks, setSavedPicks] = useState<string[]>([])
   const [error, setError] = useState<string | null>(null)
 
+  useEffect(() => {
+    try {
+      const stored = localStorage.getItem('golfpool_submitted')
+      if (stored) {
+        const data = JSON.parse(stored) as { name: string; picks: string[] }
+        if (data.name && data.picks?.length === 5) {
+          setSavedName(data.name)
+          setSavedPicks(data.picks)
+          setSubmitted(true)
+        }
+      }
+    } catch { /* ignore corrupt localStorage */ }
+  }, [])
+
+  const fullName = `${firstName.trim()} ${lastName.trim()}`.trim()
   const allPicked = [1, 2, 3, 4, 5].every((t) => selections[t])
-  const canSubmit = name.trim() !== '' && allPicked && !submitting && !submitted
+  const canSubmit = fullName !== '' && firstName.trim() !== '' && lastName.trim() !== '' && allPicked && !submitting && !submitted
 
   const handleSelect = (tier: number, golferName: string) => {
     if (submitted) return
@@ -40,11 +58,10 @@ export function TierList({ tiers, submitUrl, existingNames }: Props) {
   }
 
   const handleSubmit = async () => {
-    const trimmedName = name.trim()
-    if (!trimmedName || !allPicked || !submitUrl) return
+    if (!fullName || !allPicked || !submitUrl) return
 
-    if (existingNames.some((n) => n.toLowerCase() === trimmedName.toLowerCase())) {
-      setError(`"${trimmedName}" already has a lineup submitted. Use a different name or contact Nick.`)
+    if (existingNames.some((n) => n.toLowerCase() === fullName.toLowerCase())) {
+      setError(`"${fullName}" already has a lineup submitted. Use a different name or contact Nick.`)
       return
     }
 
@@ -52,10 +69,13 @@ export function TierList({ tiers, submitUrl, existingNames }: Props) {
     setError(null)
 
     const picks = [1, 2, 3, 4, 5].map((t) => selections[t])
-    const result = await submitPicks(submitUrl, trimmedName, picks)
+    const result = await submitPicks(submitUrl, fullName, picks)
 
     setSubmitting(false)
     if (result.ok) {
+      setSavedName(fullName)
+      setSavedPicks(picks)
+      localStorage.setItem('golfpool_submitted', JSON.stringify({ name: fullName, picks }))
       setSubmitted(true)
     } else {
       setError(result.error ?? 'Submission failed — try again.')
@@ -70,17 +90,37 @@ export function TierList({ tiers, submitUrl, existingNames }: Props) {
           <div className="text-center">
             <p className="text-sm font-medium text-emerald-400">Lineup locked!</p>
             <p className="mt-1 text-xs text-zinc-500">
-              {name}'s picks are in. Check the Leaderboard tab once the tournament starts.
+              {savedName}'s picks are in. Check the Leaderboard tab once the tournament starts.
             </p>
+            {savedPicks.length > 0 ? (
+              <div className="mt-2 flex flex-wrap justify-center gap-1.5 text-[11px]">
+                {savedPicks.map((p, i) => (
+                  <span
+                    key={i}
+                    className="rounded border border-emerald-800 bg-emerald-950/50 px-1.5 py-0.5 text-emerald-300"
+                  >
+                    T{i + 1}: {p}
+                  </span>
+                ))}
+              </div>
+            ) : null}
           </div>
         ) : (
           <>
             <div className="flex flex-wrap items-center gap-2">
               <input
                 type="text"
-                placeholder="Your name"
-                value={name}
-                onChange={(e) => setName(e.target.value)}
+                placeholder="First name"
+                value={firstName}
+                onChange={(e) => setFirstName(e.target.value)}
+                disabled={submitted}
+                className="min-w-0 flex-1 rounded-lg border border-zinc-700 bg-zinc-800 px-3 py-2 text-sm text-white placeholder:text-zinc-600 focus:border-emerald-600 focus:outline-none focus:ring-1 focus:ring-emerald-600 disabled:opacity-50"
+              />
+              <input
+                type="text"
+                placeholder="Last name"
+                value={lastName}
+                onChange={(e) => setLastName(e.target.value)}
                 disabled={submitted}
                 className="min-w-0 flex-1 rounded-lg border border-zinc-700 bg-zinc-800 px-3 py-2 text-sm text-white placeholder:text-zinc-600 focus:border-emerald-600 focus:outline-none focus:ring-1 focus:ring-emerald-600 disabled:opacity-50"
               />

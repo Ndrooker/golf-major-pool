@@ -22,6 +22,7 @@ export default function App() {
   const [competitors, setCompetitors] = useState<EspnCompetitor[]>([])
   const [oddsGolfers, setOddsGolfers] = useState<OddsGolfer[]>([])
   const [eventTitle, setEventTitle] = useState<string>('')
+  const [eventState, setEventState] = useState<'pre' | 'in' | 'post'>('pre')
   const [updatedAt, setUpdatedAt] = useState<Date | null>(null)
   const [error, setError] = useState<string | null>(null)
   const [loading, setLoading] = useState(true)
@@ -41,8 +42,9 @@ export default function App() {
   const refreshScores = useCallback(async () => {
     if (!pool) return
     try {
-      const { event, competitors: comps } = await fetchEspnLeaderboard(pool.league, pool.eventId)
+      const { event, competitors: comps, eventState: state } = await fetchEspnLeaderboard(pool.league, pool.eventId)
       setEventTitle(event.name)
+      setEventState(state)
       setCompetitors(comps)
       setRows(buildLeaderboard(pool, comps))
       setUpdatedAt(new Date())
@@ -100,8 +102,10 @@ export default function App() {
 
   const existingNames = useMemo(() => pool?.entries.map((e) => e.name) ?? [], [pool])
 
+  const tournamentStarted = eventState === 'in' || eventState === 'post'
+
   const tabs: { id: Tab; label: string }[] = [
-    { id: 'tiers', label: 'Pick Your Team' },
+    { id: 'tiers', label: tournamentStarted ? 'Live Standings' : 'Pick Your Team' },
     { id: 'board', label: 'Leaderboard' },
     { id: 'rules', label: 'Rules' },
   ]
@@ -153,13 +157,41 @@ export default function App() {
         <p className="mt-8 text-center text-zinc-500">Loading pool…</p>
       ) : null}
 
-      {/* Pick Your Team */}
+      {/* Pick Your Team / Live Standings */}
       {tab === 'tiers' && pool ? (
-        <TierList
-          tiers={tiers}
-          submitUrl={pool.submitUrl ?? null}
-          existingNames={existingNames}
-        />
+        tournamentStarted && payout ? (
+          <>
+            <div className="mt-4 flex flex-wrap items-center gap-3">
+              <button
+                type="button"
+                onClick={() => void refreshScores()}
+                className="rounded-lg bg-emerald-600 px-4 py-2 text-sm font-medium text-white shadow hover:bg-emerald-500 active:bg-emerald-700"
+              >
+                Refresh scores
+              </button>
+              {updatedAt ? (
+                <span className="text-xs text-zinc-500">
+                  Updated {updatedAt.toLocaleTimeString()}
+                </span>
+              ) : null}
+            </div>
+
+            <div className="mt-4">
+              <PayoutPanel breakdown={payout} />
+            </div>
+
+            <LeaderboardTable
+              rows={rows}
+              worstRank={rows.reduce((m, r) => Math.max(m, r.rank ?? 0), 0)}
+            />
+          </>
+        ) : (
+          <TierList
+            tiers={tiers}
+            submitUrl={pool.submitUrl ?? null}
+            existingNames={existingNames}
+          />
+        )
       ) : null}
 
       {/* Leaderboard */}
