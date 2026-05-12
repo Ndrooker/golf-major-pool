@@ -1,0 +1,45 @@
+{
+  "title": "2026 U.S. Open — friends pool",
+  "league": "pga",
+  "eventId": null,
+  "buyInDollars": 15,
+  "payoutFractions": {
+    "first": 0.5,
+    "second": 0.25,
+    "third": 0.15,
+    "shank": 0.1
+  },
+  "paidEntryCount": null,
+  "entries": [
+    {
+      "name": "Alex",
+      "picks": [
+        "Xander Schauffele",
+        "Sahith Theegala",
+        "Brian Harman",
+        "Robert MacIntyre",
+        "Andrew Novak"
+      ]
+    },
+    {
+      "name": "Jordan",
+      "picks": [
+        "Sungjae Im",
+        "J.T. Poston",
+        "Matt Wallace",
+        "Kurt Kitayama",
+        "Webb Simpson"
+      ]
+    },
+    {
+      "name": "Sam",
+      "picks": [
+        "Denny McCarthy",
+        "Jhonattan Vegas",
+        "Austin Smotherman",
+        "J.J. Spaun",
+        "Bad Name Test"
+      ]
+    }
+  ]
+}
