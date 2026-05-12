@@ -1,7 +1,7 @@
 import type { EspnCompetitor } from './api/espn'
 import type { LeaderboardRow, PoolData, PoolEntry, ResolvedPick } from './types'
 import { competitorToGolferState, parseScoreDisplay } from './api/espn'
-import { normalizeName } from './normalize'
+import { normalizeName, fuzzyNameMatch } from './normalize'
 
 const WD_DQ_STROKES = 15
 
@@ -29,12 +29,11 @@ function findCompetitor(
 ): EspnCompetitor | undefined {
   const key = normalizeName(pick)
   if (index.has(key)) return index.get(key)
+
   for (const [k, c] of index) {
-    if (k.includes(key) || key.includes(k)) {
-      const dn = normalizeName(c.athlete?.displayName ?? '')
-      if (dn === key) return c
-    }
+    if (fuzzyNameMatch(key, k)) return c
   }
+
   return undefined
 }
 
