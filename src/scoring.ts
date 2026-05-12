@@ -3,7 +3,7 @@ import type { LeaderboardRow, PoolData, PoolEntry, ResolvedPick } from './types'
 import { competitorToGolferState, parseScoreDisplay } from './api/espn'
 import { normalizeName, fuzzyNameMatch } from './normalize'
 
-const WD_DQ_STROKES = 15
+const PENALTY_OVER_WORST = 3
 
 export function buildNameIndex(competitors: EspnCompetitor[]): Map<string, EspnCompetitor> {
   const map = new Map<string, EspnCompetitor>()
@@ -87,17 +87,14 @@ export function resolveEntry(
     let strokes: number | null = golfer.scoreToPar
     let note: string | undefined
 
-    if (golfer.isWithdrawn || golfer.isDisqualified) {
-      strokes = WD_DQ_STROKES
-      note = golfer.isDisqualified ? 'DQ → +15' : 'WD → +15'
-    } else if (golfer.isCut) {
-      const base = golfer.scoreToPar ?? parseScoreDisplay(comp.score?.displayValue ?? '') ?? 0
+    if (golfer.isWithdrawn || golfer.isDisqualified || golfer.isCut) {
+      const label = golfer.isDisqualified ? 'DQ' : golfer.isWithdrawn ? 'WD' : 'MC'
       if (worstMadeCut != null) {
-        strokes = worstMadeCut + 5
-        note = `MC → worst made cut (${worstMadeCut}) + 5`
+        strokes = worstMadeCut + PENALTY_OVER_WORST
+        note = `${label} → worst made cut (${worstMadeCut >= 0 ? '+' : ''}${worstMadeCut}) + ${PENALTY_OVER_WORST}`
       } else {
-        strokes = base
-        note = 'MC (cut penalty pending field data)'
+        strokes = golfer.scoreToPar ?? parseScoreDisplay(comp.score?.displayValue ?? '') ?? 0
+        note = `${label} (penalty pending field data)`
       }
     }
 

@@ -4,7 +4,7 @@ import { fetchOdds, type OddsGolfer } from './api/odds'
 import { LeaderboardTable } from './components/LeaderboardTable'
 import { PayoutPanel } from './components/PayoutPanel'
 import { RulesPage } from './components/RulesPage'
-import { TeeTimes } from './components/TeeTimes'
+import { TournamentLeaderboard } from './components/TournamentLeaderboard'
 import { TierList } from './components/TierList'
 import { WelcomePage } from './components/WelcomePage'
 import { computePayouts } from './payouts'
@@ -53,7 +53,7 @@ export default function App() {
   const [competitors, setCompetitors] = useState<EspnCompetitor[]>([])
   const [oddsGolfers, setOddsGolfers] = useState<OddsGolfer[]>([])
   const [eventTitle, setEventTitle] = useState<string>('')
-  const [eventState, setEventState] = useState<'pre' | 'in' | 'post'>('pre')
+  const [, setEventState] = useState<'pre' | 'in' | 'post'>('pre')
   const [updatedAt, setUpdatedAt] = useState<Date | null>(null)
   const [error, setError] = useState<string | null>(null)
   const [loading, setLoading] = useState(true)
@@ -64,27 +64,27 @@ export default function App() {
   const [submission, setSubmission] = useState<SubmissionState | null>(loadSubmissionState)
 
   const hasSubmitted = submission !== null
-  const tournamentStarted = eventState === 'in' || eventState === 'post'
 
   // Determine which "phase" the user is in
   type Phase = 'welcome' | 'picking' | 'submitted'
   const phase: Phase = hasSubmitted ? 'submitted' : userState ? 'picking' : 'welcome'
 
   // Tab logic depends on phase
-  type Tab = 'standings' | 'rules' | 'pick'
-  const [tab, setTab] = useState<Tab>(phase === 'submitted' ? 'standings' : 'pick')
+  type Tab = 'leaderboard' | 'pool' | 'rules' | 'pick'
+  const [tab, setTab] = useState<Tab>(phase === 'submitted' ? 'pool' : 'pick')
 
   // Update tab when phase changes
   useEffect(() => {
     if (phase === 'submitted' && tab === 'pick') {
-      setTab('standings')
+      setTab('pool')
     }
   }, [phase, tab])
 
   const tabs = useMemo((): { id: Tab; label: string }[] => {
     if (phase === 'submitted') {
       return [
-        { id: 'standings', label: tournamentStarted ? 'Live Standings' : 'Pool' },
+        { id: 'leaderboard', label: 'Leaderboard' },
+        { id: 'pool', label: 'Pool' },
         { id: 'rules', label: 'Rules' },
       ]
     }
@@ -95,7 +95,7 @@ export default function App() {
       ]
     }
     return []
-  }, [phase, tournamentStarted])
+  }, [phase])
 
   // Data loading
   const loadPool = useCallback(async () => {
@@ -188,14 +188,14 @@ export default function App() {
     localStorage.setItem(LS_USER_KEY, JSON.stringify(user))
     setUserState(user)
     setSubmission(sub)
-    setTab('standings')
+    setTab('pool')
   }
 
   const handleSubmissionComplete = (name: string, picks: string[]) => {
     const state: SubmissionState = { name, picks }
     localStorage.setItem(LS_SUBMITTED_KEY, JSON.stringify(state))
     setSubmission(state)
-    setTab('standings')
+    setTab('pool')
   }
 
   return (
@@ -267,8 +267,18 @@ export default function App() {
         />
       ) : null}
 
-      {/* Post-submission: single consolidated view */}
-      {phase === 'submitted' && tab === 'standings' && pool ? (
+      {/* Leaderboard tab — full ESPN tournament field */}
+      {phase === 'submitted' && tab === 'leaderboard' && pool ? (
+        <TournamentLeaderboard
+          competitors={competitors}
+          userPicks={submission!.picks}
+          onRefresh={() => void refreshScores()}
+          updatedAt={updatedAt}
+        />
+      ) : null}
+
+      {/* Pool tab — prize pool + pool standings + all lineups */}
+      {phase === 'submitted' && tab === 'pool' && pool ? (
         <>
           {/* Prize Pool */}
           {payout ? (
@@ -309,20 +319,11 @@ export default function App() {
             ) : null}
           </div>
 
-          {/* Standings or Tee Times */}
-          {tournamentStarted ? (
-            <LeaderboardTable
-              rows={rows}
-              worstRank={rows.reduce((m, r) => Math.max(m, r.rank ?? 0), 0)}
-            />
-          ) : (
-            <TeeTimes
-              userName={submission!.name}
-              userPicks={submission!.picks}
-              competitors={competitors}
-              allLineups={[]}
-            />
-          )}
+          {/* Pool Standings (expandable per entry) */}
+          <LeaderboardTable
+            rows={rows}
+            worstRank={rows.reduce((m, r) => Math.max(m, r.rank ?? 0), 0)}
+          />
 
           {/* All Lineups */}
           <section className="mt-8">

@@ -19,11 +19,7 @@ export function RulesPage() {
         <ul className="mt-3 space-y-1.5 pl-4">
           <li className="flex items-start gap-2">
             <span className="mt-0.5 h-1.5 w-1.5 shrink-0 rounded-full bg-zinc-600" />
-            <span><strong className="text-zinc-100">Missed cut:</strong> Worst score among players who made the cut, +5 strokes</span>
-          </li>
-          <li className="flex items-start gap-2">
-            <span className="mt-0.5 h-1.5 w-1.5 shrink-0 rounded-full bg-zinc-600" />
-            <span><strong className="text-zinc-100">Withdrawal / DQ:</strong> +15 strokes</span>
+            <span><strong className="text-zinc-100">Missed cut / WD / DQ:</strong> Worst score among players who made the cut, +3 strokes</span>
           </li>
           <li className="flex items-start gap-2">
             <span className="mt-0.5 h-1.5 w-1.5 shrink-0 rounded-full bg-zinc-600" />
