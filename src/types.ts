@@ -24,6 +24,10 @@ export type PoolData = {
    * If null/undefined, uses number of entries in the file.
    */
   paidEntryCount?: number | null
+  /** The Odds API sport key for this major (e.g. golf_us_open_winner) */
+  oddsSport?: string | null
+  /** Google Apps Script web app URL for pick submission */
+  submitUrl?: string | null
   entries: PoolEntry[]
 }
 

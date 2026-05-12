@@ -20,6 +20,7 @@ export type EspnCompetition = {
 
 export type EspnCompetitor = {
   id: string
+  sortOrder?: number
   athlete?: {
     id: string
     displayName: string

@@ -120,6 +120,8 @@ export async function fetchPoolFromSheet(sheetId: string): Promise<PoolData> {
     buyInDollars: parseFloat(config['buyin']) || 15,
     payoutFractions: fractions,
     paidEntryCount: Number.isFinite(paidCount) && paidCount! > 0 ? paidCount : null,
+    oddsSport: config['oddssport'] || null,
+    submitUrl: config['submiturl'] || null,
     entries,
   }
 }

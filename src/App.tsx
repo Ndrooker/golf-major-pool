@@ -1,17 +1,26 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
-import { fetchEspnLeaderboard } from './api/espn'
+import { fetchEspnLeaderboard, type EspnCompetitor } from './api/espn'
+import { fetchOdds, type OddsGolfer } from './api/odds'
 import { LeaderboardTable } from './components/LeaderboardTable'
 import { PayoutPanel } from './components/PayoutPanel'
+import { RulesPage } from './components/RulesPage'
+import { TierList } from './components/TierList'
 import { computePayouts } from './payouts'
 import { buildLeaderboard } from './scoring'
+import { buildTiersFromOdds, buildTiersFromEspn, type TierDef } from './tiers'
 import { loadPoolData } from './loadPool'
 import type { LeaderboardRow, PoolData } from './types'
+
+type Tab = 'board' | 'tiers' | 'rules'
 
 const REFRESH_MS = 60_000
 
 export default function App() {
+  const [tab, setTab] = useState<Tab>('tiers')
   const [pool, setPool] = useState<PoolData | null>(null)
   const [rows, setRows] = useState<LeaderboardRow[]>([])
+  const [competitors, setCompetitors] = useState<EspnCompetitor[]>([])
+  const [oddsGolfers, setOddsGolfers] = useState<OddsGolfer[]>([])
   const [eventTitle, setEventTitle] = useState<string>('')
   const [updatedAt, setUpdatedAt] = useState<Date | null>(null)
   const [error, setError] = useState<string | null>(null)
@@ -32,15 +41,29 @@ export default function App() {
   const refreshScores = useCallback(async () => {
     if (!pool) return
     try {
-      const { event, competitors } = await fetchEspnLeaderboard(pool.league, pool.eventId)
+      const { event, competitors: comps } = await fetchEspnLeaderboard(pool.league, pool.eventId)
       setEventTitle(event.name)
-      setRows(buildLeaderboard(pool, competitors))
+      setCompetitors(comps)
+      setRows(buildLeaderboard(pool, comps))
       setUpdatedAt(new Date())
       setError(null)
     } catch (e) {
       setError(e instanceof Error ? e.message : 'Failed to load ESPN data')
     } finally {
       setLoading(false)
+    }
+  }, [pool])
+
+  const loadOdds = useCallback(async () => {
+    if (!pool) return
+    const apiKey = import.meta.env.VITE_ODDS_API_KEY?.trim()
+    const sportKey = pool.oddsSport?.trim()
+    if (!apiKey || !sportKey) return
+    try {
+      const golfers = await fetchOdds(sportKey, apiKey)
+      setOddsGolfers(golfers)
+    } catch (e) {
+      console.warn('Odds fetch failed (will use ESPN fallback):', e)
     }
   }, [pool])
 
@@ -51,16 +74,21 @@ export default function App() {
   useEffect(() => {
     if (!pool) return
     void refreshScores()
+    void loadOdds()
     const t = window.setInterval(() => void refreshScores(), REFRESH_MS)
     return () => window.clearInterval(t)
-  }, [pool, refreshScores])
+  }, [pool, refreshScores, loadOdds])
+
+  const tiers: TierDef[] = useMemo(() => {
+    if (oddsGolfers.length > 0) return buildTiersFromOdds(oddsGolfers)
+    if (competitors.length > 0) return buildTiersFromEspn(competitors)
+    return []
+  }, [oddsGolfers, competitors])
 
   const paidCount = useMemo(() => {
     if (!pool) return 0
     const raw = paidOverride.trim()
-    if (raw === '') {
-      return pool.paidEntryCount ?? pool.entries.length
-    }
+    if (raw === '') return pool.paidEntryCount ?? pool.entries.length
     const n = Number(raw)
     return Number.isFinite(n) && n >= 0 ? Math.floor(n) : pool.entries.length
   }, [pool, paidOverride])
@@ -70,9 +98,17 @@ export default function App() {
     return computePayouts(paidCount, pool.buyInDollars, pool.payoutFractions)
   }, [pool, paidCount])
 
+  const existingNames = useMemo(() => pool?.entries.map((e) => e.name) ?? [], [pool])
+
+  const tabs: { id: Tab; label: string }[] = [
+    { id: 'tiers', label: 'Pick Your Team' },
+    { id: 'board', label: 'Leaderboard' },
+    { id: 'rules', label: 'Rules' },
+  ]
+
   return (
     <div className="pb-12 pt-6">
-      <header className="border-b border-zinc-800 pb-5">
+      <header className="border-b border-zinc-800 pb-4">
         <p className="text-xs font-medium uppercase tracking-widest text-emerald-500/80">
           Major pool
         </p>
@@ -80,29 +116,29 @@ export default function App() {
           {pool?.title ?? 'Loading…'}
         </h1>
         {eventTitle ? (
-          <p className="mt-2 text-sm text-zinc-400">
-            ESPN: <span className="text-zinc-200">{eventTitle}</span>
-            {pool?.eventId ? (
-              <span className="ml-2 font-mono text-xs text-zinc-600">event {pool.eventId}</span>
-            ) : null}
+          <p className="mt-1 text-sm text-zinc-500">
+            {eventTitle}
           </p>
         ) : null}
-        <div className="mt-4 flex flex-wrap items-center gap-3">
-          <button
-            type="button"
-            onClick={() => void refreshScores()}
-            className="rounded-lg bg-emerald-600 px-4 py-2 text-sm font-medium text-white shadow hover:bg-emerald-500 active:bg-emerald-700"
-          >
-            Refresh scores
-          </button>
-          {updatedAt ? (
-            <span className="text-xs text-zinc-500">
-              Updated {updatedAt.toLocaleTimeString()}
-            </span>
-          ) : null}
-          <span className="text-xs text-zinc-600">Auto-refresh ~{REFRESH_MS / 1000}s</span>
-        </div>
       </header>
+
+      {/* Tab bar */}
+      <nav className="mt-4 flex gap-1 rounded-lg border border-zinc-800 bg-zinc-900/60 p-1">
+        {tabs.map((t) => (
+          <button
+            key={t.id}
+            type="button"
+            onClick={() => setTab(t.id)}
+            className={`flex-1 rounded-md px-3 py-2 text-center text-sm font-medium transition ${
+              tab === t.id
+                ? 'bg-emerald-600 text-white shadow'
+                : 'text-zinc-400 hover:text-zinc-200'
+            }`}
+          >
+            {t.label}
+          </button>
+        ))}
+      </nav>
 
       {error ? (
         <div
@@ -117,9 +153,34 @@ export default function App() {
         <p className="mt-8 text-center text-zinc-500">Loading pool…</p>
       ) : null}
 
-      {pool && payout ? (
+      {/* Pick Your Team */}
+      {tab === 'tiers' && pool ? (
+        <TierList
+          tiers={tiers}
+          submitUrl={pool.submitUrl ?? null}
+          existingNames={existingNames}
+        />
+      ) : null}
+
+      {/* Leaderboard */}
+      {tab === 'board' && pool && payout ? (
         <>
-          <div className="mt-6">
+          <div className="mt-4 flex flex-wrap items-center gap-3">
+            <button
+              type="button"
+              onClick={() => void refreshScores()}
+              className="rounded-lg bg-emerald-600 px-4 py-2 text-sm font-medium text-white shadow hover:bg-emerald-500 active:bg-emerald-700"
+            >
+              Refresh scores
+            </button>
+            {updatedAt ? (
+              <span className="text-xs text-zinc-500">
+                Updated {updatedAt.toLocaleTimeString()}
+              </span>
+            ) : null}
+          </div>
+
+          <div className="mt-4">
             <label className="block text-xs font-medium uppercase tracking-wide text-zinc-500">
               Paid spots (for pot math)
             </label>
@@ -133,13 +194,12 @@ export default function App() {
                 className="w-28 rounded-lg border border-zinc-700 bg-zinc-900 px-3 py-2 font-mono text-sm text-white placeholder:text-zinc-600 focus:border-emerald-600 focus:outline-none focus:ring-1 focus:ring-emerald-600"
               />
               <span className="text-xs text-zinc-500">
-                Leave blank to use file: {pool.paidEntryCount ?? pool.entries.length} (or override
-                after Venmos roll in)
+                {pool.paidEntryCount ?? pool.entries.length} entries
               </span>
             </div>
           </div>
 
-          <div className="mt-5">
+          <div className="mt-4">
             <PayoutPanel breakdown={payout} />
           </div>
 
@@ -179,16 +239,11 @@ export default function App() {
               </table>
             </div>
           </section>
-
-          <footer className="mt-10 text-center text-[11px] leading-relaxed text-zinc-600">
-            Pool strokes use ESPN live data. WD/DQ picks count +15. MC uses worst made-cut score +5
-            when the field is available. Edit <code className="text-zinc-500">public/pool-data.json</code>{' '}
-            or set <code className="text-zinc-500">VITE_POOL_DATA_URL</code>. Optional:{' '}
-            <code className="text-zinc-500">?pool=https://…/data.json</code> to load remote JSON
-            without redeploying.
-          </footer>
         </>
       ) : null}
+
+      {/* Rules */}
+      {tab === 'rules' ? <RulesPage /> : null}
     </div>
   )
 }
