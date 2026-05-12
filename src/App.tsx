@@ -181,6 +181,17 @@ export default function App() {
     setTab('pick')
   }
 
+  const handleReturningUser = (name: string, picks: string[]) => {
+    const sub: SubmissionState = { name, picks }
+    localStorage.setItem(LS_SUBMITTED_KEY, JSON.stringify(sub))
+    const parts = name.split(' ')
+    const user: UserState = { firstName: parts[0] ?? '', lastName: parts.slice(1).join(' ') ?? '' }
+    localStorage.setItem(LS_USER_KEY, JSON.stringify(user))
+    setUserState(user)
+    setSubmission(sub)
+    setTab('standings')
+  }
+
   const handleSubmissionComplete = (name: string, picks: string[]) => {
     const state: SubmissionState = { name, picks }
     localStorage.setItem(LS_SUBMITTED_KEY, JSON.stringify(state))
@@ -239,7 +250,9 @@ export default function App() {
       {phase === 'welcome' && pool ? (
         <WelcomePage
           poolTitle={pool.title}
+          existingEntries={pool.entries.map((e) => ({ name: e.name, picks: [...e.picks] }))}
           onContinue={handleOnboardingComplete}
+          onReturningUser={handleReturningUser}
         />
       ) : null}
 
