@@ -71,7 +71,7 @@ export default function App() {
   const phase: Phase = hasSubmitted ? 'submitted' : userState ? 'picking' : 'welcome'
 
   // Tab logic depends on phase
-  type Tab = 'standings' | 'lineups' | 'rules' | 'pick'
+  type Tab = 'standings' | 'rules' | 'pick'
   const [tab, setTab] = useState<Tab>(phase === 'submitted' ? 'standings' : 'pick')
 
   // Update tab when phase changes
@@ -84,8 +84,7 @@ export default function App() {
   const tabs = useMemo((): { id: Tab; label: string }[] => {
     if (phase === 'submitted') {
       return [
-        { id: 'standings', label: tournamentStarted ? 'Live Standings' : 'Tee Times' },
-        { id: 'lineups', label: 'All Lineups' },
+        { id: 'standings', label: tournamentStarted ? 'Live Standings' : 'Pool' },
         { id: 'rules', label: 'Rules' },
       ]
     }
@@ -268,115 +267,110 @@ export default function App() {
         />
       ) : null}
 
-      {/* Post-submission: Standings / Tee Times */}
+      {/* Post-submission: single consolidated view */}
       {phase === 'submitted' && tab === 'standings' && pool ? (
-        tournamentStarted && payout ? (
-          <>
-            <div className="mt-4 flex flex-wrap items-center gap-3">
-              <button
-                type="button"
-                onClick={() => void refreshScores()}
-                className="rounded-lg bg-emerald-600 px-4 py-2 text-sm font-medium text-white shadow hover:bg-emerald-500 active:bg-emerald-700"
-              >
-                Refresh scores
-              </button>
-              {updatedAt ? (
-                <span className="text-xs text-zinc-500">
-                  Updated {updatedAt.toLocaleTimeString()}
-                </span>
-              ) : null}
-            </div>
-
-            <div className="mt-4">
-              <PayoutPanel breakdown={payout} />
-            </div>
-
-            <LeaderboardTable
-              rows={rows}
-              worstRank={rows.reduce((m, r) => Math.max(m, r.rank ?? 0), 0)}
-            />
-          </>
-        ) : (
-          <TeeTimes
-            userName={submission!.name}
-            userPicks={submission!.picks}
-            competitors={competitors}
-            allLineups={pool.entries.map((e) => ({ name: e.name, picks: [...e.picks] }))}
-          />
-        )
-      ) : null}
-
-      {/* All Lineups tab (post-submission only) */}
-      {phase === 'submitted' && tab === 'lineups' && pool ? (
-        <section className="mt-6">
-          <h2 className="text-sm font-semibold uppercase tracking-wide text-emerald-400/90">
-            All Lineups ({pool.entries.length} entries)
-          </h2>
-          <div className="mt-2 overflow-x-auto rounded-xl border border-zinc-800">
-            <table className="w-full min-w-[32rem] text-left text-xs">
-              <thead>
-                <tr className="border-b border-zinc-800 bg-zinc-900/80 text-zinc-500">
-                  <th className="px-2 py-2 font-medium">Player</th>
-                  <th className="px-2 py-2 font-medium">T1</th>
-                  <th className="px-2 py-2 font-medium">T2</th>
-                  <th className="px-2 py-2 font-medium">T3</th>
-                  <th className="px-2 py-2 font-medium">T4</th>
-                  <th className="px-2 py-2 font-medium">T5</th>
-                </tr>
-              </thead>
-              <tbody>
-                {pool.entries.map((e) => (
-                  <tr
-                    key={e.name}
-                    className={`border-t border-zinc-800/80 ${
-                      submission && e.name.toLowerCase() === submission.name.toLowerCase()
-                        ? 'bg-emerald-950/20'
-                        : ''
-                    }`}
-                  >
-                    <td className="px-2 py-2 font-medium text-zinc-200">{e.name}</td>
-                    {e.picks.map((p, i) => (
-                      <td key={i} className="max-w-[7rem] truncate px-2 py-2 text-zinc-400">
-                        {p}
-                      </td>
-                    ))}
-                  </tr>
-                ))}
-                {pool.entries.length === 0 ? (
-                  <tr>
-                    <td colSpan={6} className="px-3 py-4 text-center text-zinc-600">
-                      No entries yet.
-                    </td>
-                  </tr>
-                ) : null}
-              </tbody>
-            </table>
-          </div>
-
+        <>
+          {/* Prize Pool */}
           {payout ? (
-            <div className="mt-6">
-              <label className="block text-xs font-medium uppercase tracking-wide text-zinc-500">
-                Paid spots (for pot math)
-              </label>
-              <div className="mt-1 flex flex-wrap items-center gap-2">
+            <div className="mt-4">
+              <div className="mb-3 flex flex-wrap items-center gap-2">
+                <label className="text-xs font-medium uppercase tracking-wide text-zinc-500">
+                  Paid spots
+                </label>
                 <input
                   type="number"
                   min={0}
                   placeholder={String(pool.paidEntryCount ?? pool.entries.length)}
                   value={paidOverride}
                   onChange={(e) => setPaidOverride(e.target.value)}
-                  className="w-28 rounded-lg border border-zinc-700 bg-zinc-900 px-3 py-2 font-mono text-sm text-white placeholder:text-zinc-600 focus:border-emerald-600 focus:outline-none focus:ring-1 focus:ring-emerald-600"
+                  className="w-20 rounded-lg border border-zinc-700 bg-zinc-900 px-2 py-1.5 font-mono text-xs text-white placeholder:text-zinc-600 focus:border-emerald-600 focus:outline-none focus:ring-1 focus:ring-emerald-600"
                 />
-                <span className="text-xs text-zinc-500">
+                <span className="text-xs text-zinc-600">
                   {pool.paidEntryCount ?? pool.entries.length} entries
                 </span>
               </div>
-              <div className="mt-3">
-                <PayoutPanel breakdown={payout} />
-              </div>
+              <PayoutPanel breakdown={payout} />
             </div>
           ) : null}
-        </section>
+
+          {/* Refresh + timestamp */}
+          <div className="mt-4 flex flex-wrap items-center gap-3">
+            <button
+              type="button"
+              onClick={() => void refreshScores()}
+              className="rounded-lg bg-emerald-600 px-4 py-2 text-sm font-medium text-white shadow hover:bg-emerald-500 active:bg-emerald-700"
+            >
+              Refresh scores
+            </button>
+            {updatedAt ? (
+              <span className="text-xs text-zinc-500">
+                Updated {updatedAt.toLocaleTimeString()}
+              </span>
+            ) : null}
+          </div>
+
+          {/* Standings or Tee Times */}
+          {tournamentStarted ? (
+            <LeaderboardTable
+              rows={rows}
+              worstRank={rows.reduce((m, r) => Math.max(m, r.rank ?? 0), 0)}
+            />
+          ) : (
+            <TeeTimes
+              userName={submission!.name}
+              userPicks={submission!.picks}
+              competitors={competitors}
+              allLineups={[]}
+            />
+          )}
+
+          {/* All Lineups */}
+          <section className="mt-8">
+            <h2 className="text-sm font-semibold uppercase tracking-wide text-emerald-400/90">
+              All Lineups ({pool.entries.length} entries)
+            </h2>
+            <div className="mt-2 overflow-x-auto rounded-xl border border-zinc-800">
+              <table className="w-full min-w-[32rem] text-left text-xs">
+                <thead>
+                  <tr className="border-b border-zinc-800 bg-zinc-900/80 text-zinc-500">
+                    <th className="px-2 py-2 font-medium">Player</th>
+                    <th className="px-2 py-2 font-medium">T1</th>
+                    <th className="px-2 py-2 font-medium">T2</th>
+                    <th className="px-2 py-2 font-medium">T3</th>
+                    <th className="px-2 py-2 font-medium">T4</th>
+                    <th className="px-2 py-2 font-medium">T5</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {pool.entries.map((e) => (
+                    <tr
+                      key={e.name}
+                      className={`border-t border-zinc-800/80 ${
+                        submission && e.name.toLowerCase() === submission.name.toLowerCase()
+                          ? 'bg-emerald-950/20'
+                          : ''
+                      }`}
+                    >
+                      <td className="px-2 py-2 font-medium text-zinc-200">{e.name}</td>
+                      {e.picks.map((p, i) => (
+                        <td key={i} className="max-w-[7rem] truncate px-2 py-2 text-zinc-400">
+                          {p}
+                        </td>
+                      ))}
+                    </tr>
+                  ))}
+                  {pool.entries.length === 0 ? (
+                    <tr>
+                      <td colSpan={6} className="px-3 py-4 text-center text-zinc-600">
+                        No entries yet.
+                      </td>
+                    </tr>
+                  ) : null}
+                </tbody>
+              </table>
+            </div>
+          </section>
+        </>
       ) : null}
 
       {/* Rules */}
