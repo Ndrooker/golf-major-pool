@@ -105,9 +105,7 @@ export async function fetchPoolFromSheet(sheetId: string): Promise<PoolData> {
   const config = parseConfigTab(parseCSV(configText))
   const entries = parseEntriesTab(parseCSV(entriesText))
 
-  if (entries.length === 0) {
-    throw new Error('No valid entries found in the Entries tab (need Name + 5 picks per row)')
-  }
+  // No entries yet is fine — pool is open for submissions
 
   const fractions: PayoutFractions = {
     first: parseFloat(config['first']) || 0.5,
