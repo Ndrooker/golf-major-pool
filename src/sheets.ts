@@ -1,7 +1,13 @@
 import type { PoolData, PoolEntry, PayoutFractions } from './types'
 
-function csvUrl(sheetId: string, tab: string): string {
-  return `https://docs.google.com/spreadsheets/d/${sheetId}/gviz/tq?tqx=out:csv&sheet=${encodeURIComponent(tab)}`
+/** Config tab uses the export endpoint (gid=0) to avoid gviz type-detection bugs */
+function configCsvUrl(sheetId: string): string {
+  return `https://docs.google.com/spreadsheets/d/${sheetId}/export?format=csv&gid=0`
+}
+
+/** Entries tab uses gviz/tq which works fine for tabular data */
+function entriesCsvUrl(sheetId: string): string {
+  return `https://docs.google.com/spreadsheets/d/${sheetId}/gviz/tq?tqx=out:csv&sheet=Entries`
 }
 
 /**
@@ -56,7 +62,7 @@ function parseConfigTab(rows: string[][]): Record<string, string> {
   for (const row of rows) {
     const key = row[0]?.trim().toLowerCase()
     const val = row[1]?.trim() ?? ''
-    if (key) map[key] = val
+    if (key && key !== 'key') map[key] = val
   }
   return map
 }
@@ -82,8 +88,8 @@ function parseEntriesTab(rows: string[][]): PoolEntry[] {
 
 export async function fetchPoolFromSheet(sheetId: string): Promise<PoolData> {
   const [configRes, entriesRes] = await Promise.all([
-    fetch(csvUrl(sheetId, 'Config')),
-    fetch(csvUrl(sheetId, 'Entries')),
+    fetch(configCsvUrl(sheetId)),
+    fetch(entriesCsvUrl(sheetId)),
   ])
 
   if (!configRes.ok) {
