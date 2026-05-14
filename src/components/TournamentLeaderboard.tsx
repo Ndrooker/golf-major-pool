@@ -1,13 +1,55 @@
+import { useMemo } from 'react'
 import type { EspnCompetitor } from '../api/espn'
-import { normalizeName, fuzzyNameMatch } from '../normalize'
 import { competitorToGolferState } from '../api/espn'
+import { normalizeName, fuzzyNameMatch } from '../normalize'
 import { formatRelativeToPar } from '../format'
+import type { GolferState } from '../types'
 
 type Props = {
   competitors: EspnCompetitor[]
   userPicks: string[]
   onRefresh: () => void
   updatedAt: Date | null
+}
+
+type SortableRow = {
+  competitor: EspnCompetitor
+  name: string
+  golfer: GolferState | null
+  score: number | null
+  thruNum: number
+}
+
+function parseThru(thruDisplay: string | null | undefined): number {
+  if (!thruDisplay) return 0
+  const cleaned = thruDisplay.replace(/[^0-9]/g, '')
+  const n = parseInt(cleaned, 10)
+  return Number.isFinite(n) ? n : 0
+}
+
+function sortCompetitors(competitors: EspnCompetitor[]): SortableRow[] {
+  const rows: SortableRow[] = []
+  for (const c of competitors) {
+    const name = c.athlete?.displayName ?? ''
+    if (!name) continue
+    const golfer = competitorToGolferState(c)
+    const score = golfer?.scoreToPar ?? null
+    const thruRaw = golfer?.thruDisplay ?? c.status?.displayThru ?? c.status?.thru?.toString() ?? null
+    const thruNum = parseThru(thruRaw)
+    rows.push({ competitor: c, name, golfer, score, thruNum })
+  }
+
+  rows.sort((a, b) => {
+    const scoreA = a.score ?? 999
+    const scoreB = b.score ?? 999
+    if (scoreA !== scoreB) return scoreA - scoreB
+    // Same score: prefer player who has played more holes
+    if (a.thruNum !== b.thruNum) return b.thruNum - a.thruNum
+    // Final tiebreaker: alphabetical
+    return a.name.localeCompare(b.name)
+  })
+
+  return rows
 }
 
 function isUserPick(competitorName: string, userPicks: string[]): boolean {
@@ -19,6 +61,8 @@ function isUserPick(competitorName: string, userPicks: string[]): boolean {
 }
 
 export function TournamentLeaderboard({ competitors, userPicks, onRefresh, updatedAt }: Props) {
+  const sorted = useMemo(() => sortCompetitors(competitors), [competitors])
+
   return (
     <section className="mt-4">
       <div className="flex flex-wrap items-center gap-3">
@@ -47,14 +91,11 @@ export function TournamentLeaderboard({ competitors, userPicks, onRefresh, updat
             </tr>
           </thead>
           <tbody>
-            {competitors.map((c) => {
-              const name = c.athlete?.displayName ?? ''
-              if (!name) return null
-              const golfer = competitorToGolferState(c)
+            {sorted.map((row) => {
+              const { competitor: c, name, golfer, score, thruNum } = row
               const picked = isUserPick(name, userPicks)
               const pos = c.status?.position?.displayName ?? '—'
-              const score = golfer?.scoreToPar
-              const thru = golfer?.thruDisplay ?? c.status?.displayValue ?? '—'
+              const thruDisplay = golfer?.thruDisplay ?? c.status?.displayValue ?? '—'
 
               return (
                 <tr
@@ -83,11 +124,13 @@ export function TournamentLeaderboard({ competitors, userPicks, onRefresh, updat
                   }`}>
                     {score == null ? '—' : formatRelativeToPar(score)}
                   </td>
-                  <td className="px-3 py-2 text-right text-xs text-zinc-500">{thru}</td>
+                  <td className="px-3 py-2 text-right text-xs text-zinc-500">
+                    {thruNum > 0 ? thruNum : thruDisplay}
+                  </td>
                 </tr>
               )
             })}
-            {competitors.length === 0 ? (
+            {sorted.length === 0 ? (
               <tr>
                 <td colSpan={4} className="px-3 py-6 text-center text-zinc-600">
                   Tournament field not yet available.
